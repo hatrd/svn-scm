@@ -118,12 +118,57 @@ export class RepoLogProvider
           return this.refresh();
           // TODO refresh only required repo, need to pass element === getChildren()
         }
-      )
+      ),
+      commands.registerCommand(
+        "svn.repolog.filterAuthor",
+        this.filterAuthorGui,
+        this
+      ),
+      commands.registerCommand("svn.repolog.filterMsg", this.filterMsgGui, this)
     );
   }
 
   public dispose() {
     dispose(this._dispose);
+  }
+  public filterAuthorGui() {
+    const box = window.createInputBox();
+    box.prompt = "Search for commit authors on current results";
+    box.onDidAccept(async () => {
+      const search = box.value;
+      box.dispose();
+      for (const v of this.logCache.values()) {
+        // author filter
+        const len = v.entries.length;
+        const entries = v.entries.filter(e => e.author.includes(search));
+        v.entries = entries;
+        window.showInformationMessage(
+          `Found ${v.entries.length} commits in ${len} cache.`
+        );
+      }
+      this._onDidChangeTreeData.fire(undefined);
+    });
+    box.show();
+  }
+
+  public filterMsgGui() {
+    const box = window.createInputBox();
+    box.prompt = "Search for commit message on current results";
+    box.onDidAccept(async () => {
+      const search = box.value;
+      box.dispose();
+      for (const v of this.logCache.values()) {
+        // msg filter
+        const len = v.entries.length;
+        const entries = v.entries.filter(e => e.msg.includes(search));
+        v.entries = entries;
+        window.showInformationMessage(
+          `Found ${v.entries.length} commits in ${len} cache.`
+        );
+      }
+      this._onDidChangeTreeData.fire(undefined);
+    });
+    box.show();
   }
 
   public removeRepo(element: ILogTreeItem) {
