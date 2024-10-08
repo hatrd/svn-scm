@@ -73,6 +73,8 @@ export class RepoLogProvider
     ._onDidChangeTreeData.event;
   // TODO on-disk cache?
   private readonly logCache: Map<string, ICachedLog> = new Map();
+  private filterAuthor: string = "";
+  private filterMsg: string = "";
   private _dispose: Disposable[] = [];
 
   private getCached(maybeItem?: ILogTreeItem): ICachedLog {
@@ -131,21 +133,14 @@ export class RepoLogProvider
   public dispose() {
     dispose(this._dispose);
   }
+
   public filterAuthorGui() {
     const box = window.createInputBox();
-    box.prompt = "Search for commit authors on current results";
+    box.prompt = "Set filter for commit authors, empty to reset";
+    box.value = this.filterAuthor;
     box.onDidAccept(async () => {
-      const search = box.value;
+      this.filterAuthor = box.value;
       box.dispose();
-      for (const v of this.logCache.values()) {
-        // author filter
-        const len = v.entries.length;
-        const entries = v.entries.filter(e => e.author.includes(search));
-        v.entries = entries;
-        window.showInformationMessage(
-          `Found ${v.entries.length} commits in ${len} cache.`
-        );
-      }
       this._onDidChangeTreeData.fire(undefined);
     });
     box.show();
@@ -153,19 +148,11 @@ export class RepoLogProvider
 
   public filterMsgGui() {
     const box = window.createInputBox();
-    box.prompt = "Search for commit message on current results";
+    box.prompt = "Set filter for commit message, empty to reset";
+    box.value = this.filterMsg;
     box.onDidAccept(async () => {
-      const search = box.value;
+      this.filterMsg = box.value;
       box.dispose();
-      for (const v of this.logCache.values()) {
-        // msg filter
-        const len = v.entries.length;
-        const entries = v.entries.filter(e => e.msg.includes(search));
-        v.entries = entries;
-        window.showInformationMessage(
-          `Found ${v.entries.length} commits in ${len} cache.`
-        );
-      }
       this._onDidChangeTreeData.fire(undefined);
     });
     box.show();
@@ -436,7 +423,17 @@ export class RepoLogProvider
       if (logentries.length === 0) {
         await fetchMore(cached);
       }
-      const result = transform(logentries, LogTreeItemKind.Commit, element);
+      // filter
+      const logFiltered = logentries.filter(
+        ({ author, msg }) =>
+          (this.filterAuthor === "" || author.includes(this.filterAuthor)) &&
+          (this.filterMsg === "" || msg.includes(this.filterMsg))
+      );
+
+      window.showInformationMessage(
+        `Filtered ${logFiltered.length} of ${logentries.length} entries`
+      );
+      const result = transform(logFiltered, LogTreeItemKind.Commit, element);
       insertBaseMarker(cached, logentries, result);
       if (!cached.isComplete) {
         const ti = new TreeItem(`Load another ${limit} revisions`);

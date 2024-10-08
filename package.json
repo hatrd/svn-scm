@@ -329,13 +329,13 @@
             {
                 "command": "svn.repolog.filterAuthor",
                 "category": "SVN",
-                "title": "Filter log by author",
+                "title": "Set filter by author",
                 "icon": "$(zap)"
             },
             {
                 "command": "svn.repolog.filterMsg",
                 "category": "SVN",
-                "title": "Filter log by message",
+                "title": "Set filter by message",
                 "icon": "$(filter)"
             },
             {
