@@ -330,7 +330,7 @@
                 "command": "svn.repolog.filterAuthor",
                 "category": "SVN",
                 "title": "Set filter by author",
-                "icon": "$(zap)"
+                "icon": "$(account)"
             },
             {
                 "command": "svn.repolog.filterMsg",
