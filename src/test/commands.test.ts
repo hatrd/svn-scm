@@ -31,9 +31,11 @@ suite("Commands Tests", () => {
   });
 
   suiteTeardown(() => {
-    sourceControlManager.openRepositories.forEach(repository =>
-      repository.dispose()
-    );
+    if (sourceControlManager && sourceControlManager.openRepositories) {
+      sourceControlManager.openRepositories.forEach(repository =>
+        repository.dispose()
+      );
+    }
     testUtil.destroyAllTempPaths();
   });
 
