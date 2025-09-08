@@ -130,7 +130,7 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/master' && github.event_name == 'push') || github.event_name == 'workflow_dispatch'
     needs: [build, eslint, artifact]
     
     steps:
@@ -158,10 +158,16 @@ jobs:
         with:
           name: "svn-scm-community-ovsx-${{ github.sha }}.vsix"
 
+      - name: Get package version
+        id: package-version
+        run: |
+          echo "PACKAGE_VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_ENV
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
         with:
+          tag_name: v${{ env.PACKAGE_VERSION }}
+          name: Release v${{ env.PACKAGE_VERSION }}
           files: |
             svn-scm-community.vsix
             svn-scm-community-ovsx.vsix
