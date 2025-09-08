@@ -1,9 +1,9 @@
 {
-    "name": "svn-scm",
-    "displayName": "SVN",
-    "description": "Integrated Subversion source control",
-    "version": "3.0.0",
-    "publisher": "johnstoncode",
+    "name": "svn-scm-community",
+    "displayName": "SVN (Community Edition)",
+    "description": "Integrated Subversion source control - Community maintained fork",
+    "version": "3.0.1",
+    "publisher": "svn-community",
     "engines": {
         "node": ">=22.18.0",
         "vscode": "^1.85.0"
@@ -11,13 +11,13 @@
     "private": true,
     "enableProposedApi": false,
     "icon": "images/subversion.png",
-    "homepage": "https://github.com/JohnstonCode/svn-scm/blob/master/README.md",
+    "homepage": "https://github.com/hatrd/svn-scm/blob/master/README.md",
     "repository": {
         "type": "git",
-        "url": "https://github.com/JohnstonCode/svn-scm.git"
+        "url": "https://github.com/hatrd/svn-scm.git"
     },
     "bugs": {
-        "url": "https://github.com/JohnstonCode/svn-scm/issues"
+        "url": "https://github.com/hatrd/svn-scm/issues"
     },
     "categories": [
         "Other",

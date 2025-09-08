@@ -30,11 +30,11 @@ jobs:
           node-version: '22.18'
 
       - name: Install Dependencies
-        run: 'yarn install --frozen-lockfile || yarn install --frozen-lockfile'
+        run: npm ci
         shell: bash
       
       - name: Compile sources for tests
-        run: yarn run test-compile
+        run: npm run test-compile
 
       - name: Cache VSCode binary
         id: cache-vscode
@@ -49,16 +49,17 @@ jobs:
       - name: Run tests
         uses: coactions/setup-xvfb@v1
         with:
-          run: yarn test
+          run: npm test
         env:
           CODE_VERSION: ${{ matrix.version }}
         continue-on-error: ${{ matrix.version == 'insiders' }}
 
       - name: Release
-        if: startsWith(matrix.os, 'ubuntu') && matrix.version == 'stable' && github.ref == 'refs/heads/master' && github.repository == 'JohnstonCode/svn-scm'
+        if: startsWith(matrix.os, 'ubuntu') && matrix.version == 'stable' && github.ref == 'refs/heads/master'
         run: |
-          yarn run organize
-          yarn run semantic-release
+          npm run organize
+          npx @vscode/vsce package -o svn-scm-community.vsix
+          npm run semantic-release
         env:
           VSCE_TOKEN: ${{ secrets.vsceToken }}
           GITHUB_TOKEN: ${{ secrets.githubToken }}
@@ -82,11 +83,11 @@ jobs:
           node-version: '22.18'
 
       - name: Install Dependencies
-        run: 'yarn install --frozen-lockfile || yarn install --frozen-lockfile'
+        run: npm ci
         shell: bash
 
       - name: Lint check
-        run: yarn run lint --silent -- -f stylish
+        run: npm run lint --silent -- -f stylish
 
   artifact:
     runs-on: ubuntu-latest
@@ -102,28 +103,29 @@ jobs:
           node-version: '22.18'
 
       - name: Install Dependencies
-        run: 'yarn install --frozen-lockfile || yarn install --frozen-lockfile'
+        run: npm ci
         shell: bash
 
       - name: Package extension
-        run: npx @vscode/vsce package -o svn-scm.vsix
+        run: npx @vscode/vsce package -o svn-scm-community.vsix
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: "svn-scm-${{ github.sha }}.vsix"
-          path: "svn-scm.vsix"
+          name: "svn-scm-community-${{ github.sha }}.vsix"
+          path: "svn-scm-community.vsix"
 
-      - name: Package open-vsx extension
+      - name: Package OpenVSX extension
         run: |
-          yarn add iconv-lite jschardet
-          npx @vscode/vsce package -o svn-scm-ovsx.vsix
+          npm add iconv-lite jschardet
+          npx @vscode/vsce package -o svn-scm-community-ovsx.vsix
 
-      - name: Upload open-vsx artifact
+      - name: Upload OpenVSX artifact
         uses: actions/upload-artifact@v4
         with:
-          name: "svn-scm-ovsx-${{ github.sha }}.vsix"
-          path: "svn-scm-ovsx.vsix"
+          name: "svn-scm-community-ovsx-${{ github.sha }}.vsix"
+          path: "svn-scm-community-ovsx.vsix"
+
 
   release:
     runs-on: ubuntu-latest
@@ -142,25 +144,32 @@ jobs:
           node-version: '22.18'
 
       - name: Install Dependencies
-        run: 'yarn install --frozen-lockfile || yarn install --frozen-lockfile'
+        run: npm ci
         shell: bash
 
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: "svn-scm-${{ github.sha }}.vsix"
-
-      - name: Publish to VSCode Marketplace
-        run: npx @vscode/vsce publish --packagePath svn-scm.vsix
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_TOKEN }}
+          name: "svn-scm-community-${{ github.sha }}.vsix"
 
       - name: Download OpenVSX artifact
         uses: actions/download-artifact@v4
         with:
-          name: "svn-scm-ovsx-${{ github.sha }}.vsix"
+          name: "svn-scm-community-ovsx-${{ github.sha }}.vsix"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            svn-scm-community.vsix
+            svn-scm-community-ovsx.vsix
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish to OpenVSX Registry
-        run: npx ovsx publish svn-scm-ovsx.vsix
+        if: startsWith(github.ref, 'refs/tags/')
+        run: npx ovsx publish svn-scm-community-ovsx.vsix
         env:
           OVSX_PAT: ${{ secrets.OVSX_TOKEN }}
