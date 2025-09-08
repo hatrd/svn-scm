@@ -22,12 +22,12 @@ jobs:
 
     steps:
       - name: Clone repository
-        uses: actions/checkout@v1
+        uses: actions/checkout@v4
 
       - name: Setup Node
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v4
         with:
-          node-version: '12.17'
+          node-version: '22.18'
 
       - name: Install Dependencies
         run: 'yarn install --frozen-lockfile || yarn install --frozen-lockfile'
@@ -38,7 +38,7 @@ jobs:
 
       - name: Cache VSCode binary
         id: cache-vscode
-        uses: actions/cache@v1
+        uses: actions/cache@v4
         with:
           path: .vscode-test
           key: vscode-${{ runner.os }}-${{ matrix.version }}-${{ github.run_id }}
@@ -47,7 +47,7 @@ jobs:
             vscode-${{ runner.os }}-
       
       - name: Run tests
-        uses: GabrielBB/xvfb-action@v1.0
+        uses: coactions/setup-xvfb@v1
         with:
           run: yarn test
         env:
@@ -74,12 +74,12 @@ jobs:
 
     steps:
       - name: Clone repository
-        uses: actions/checkout@v1
+        uses: actions/checkout@v4
 
       - name: Setup Node
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v4
         with:
-          node-version: '12.17'
+          node-version: '22.18'
 
       - name: Install Dependencies
         run: 'yarn install --frozen-lockfile || yarn install --frozen-lockfile'
@@ -94,22 +94,22 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Setup Node
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v4
         with:
-          node-version: '12.17'
+          node-version: '22.18'
 
       - name: Install Dependencies
         run: 'yarn install --frozen-lockfile || yarn install --frozen-lockfile'
         shell: bash
 
       - name: Package extension
-        run: npx vsce package -o svn-scm.vsix
+        run: npx @vscode/vsce package -o svn-scm.vsix
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v4
         with:
           name: "svn-scm-${{ github.sha }}.vsix"
           path: "svn-scm.vsix"
@@ -117,10 +117,50 @@ jobs:
       - name: Package open-vsx extension
         run: |
           yarn add iconv-lite jschardet
-          npx vsce package -o svn-scm-ovsx.vsix
+          npx @vscode/vsce package -o svn-scm-ovsx.vsix
 
       - name: Upload open-vsx artifact
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v4
         with:
           name: "svn-scm-ovsx-${{ github.sha }}.vsix"
           path: "svn-scm-ovsx.vsix"
+
+  release:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    needs: [build, eslint, artifact]
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.18'
+
+      - name: Install Dependencies
+        run: 'yarn install --frozen-lockfile || yarn install --frozen-lockfile'
+        shell: bash
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: "svn-scm-${{ github.sha }}.vsix"
+
+      - name: Publish to VSCode Marketplace
+        run: npx @vscode/vsce publish --packagePath svn-scm.vsix
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_TOKEN }}
+
+      - name: Download OpenVSX artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: "svn-scm-ovsx-${{ github.sha }}.vsix"
+
+      - name: Publish to OpenVSX Registry
+        run: npx ovsx publish svn-scm-ovsx.vsix
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_TOKEN }}

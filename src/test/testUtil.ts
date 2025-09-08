@@ -222,12 +222,12 @@ export function overrideNextShowQuickPick(value: any) {
 const originalShowQuickPick = window.showQuickPick;
 
 window.showQuickPick = (
-  items: any[] | Thenable<any[]>,
+  items: readonly string[] | Thenable<readonly string[]>,
   ...args: any[]
 ): Thenable<any | undefined> => {
   let next = overridesShowQuickPick.shift();
   if (typeof next === "undefined") {
-    return originalShowQuickPick.call(null, [items, ...args]);
+    return originalShowQuickPick.call(null, [items as any, ...args]);
   }
 
   if (typeof next === "number" && Array.isArray(items)) {
