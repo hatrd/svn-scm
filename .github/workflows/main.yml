@@ -76,6 +76,8 @@ jobs:
       - name: Release
         if: startsWith(matrix.os, 'ubuntu') && matrix.version == 'stable' && github.ref == 'refs/heads/master'
         run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
           npm run organize
           npx @vscode/vsce package -o svn-scm-community.vsix
           npm run semantic-release
@@ -83,10 +85,6 @@ jobs:
           VSCE_TOKEN: ${{ secrets.VSCE_TOKEN }}
           GITHUB_TOKEN: ${{ github.token }}
           GH_TOKEN: ${{ github.token }}
-          GIT_AUTHOR_EMAIL: ${{ secrets.GIT_EMAIL }}
-          GIT_COMMITTER_EMAIL: ${{ secrets.GIT_EMAIL }}
-          GIT_AUTHOR_NAME: ${{ secrets.GIT_NAME }}
-          GIT_COMMITTER_NAME: ${{ secrets.GIT_NAME }}
 
   eslint:
     runs-on: ubuntu-latest
