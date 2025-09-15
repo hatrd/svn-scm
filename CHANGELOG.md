@@ -1,3 +1,14 @@
+## [3.0.5](https://github.com/hatrd/svn-scm/compare/v3.0.4...v3.0.5) (2025-09-15)
+
+
+### Bug Fixes
+
+* enhance multi-repository support for complex SVN workspace hierarchies ([ad44d5c](https://github.com/hatrd/svn-scm/commit/ad44d5c8f066dcdb92da287809cf3de90c9eaa8c))
+* local test register temp_svn_fs repeatedly. ([a9c21e3](https://github.com/hatrd/svn-scm/commit/a9c21e3cfcb7f7427bfb729be86530ea4cc2adc5))
+* modernize SCSS to eliminate Sass deprecation warnings ([3486dc6](https://github.com/hatrd/svn-scm/commit/3486dc696fbbee9100293313bdc4b1a8bf3e405d))
+* multirepo test ([5255251](https://github.com/hatrd/svn-scm/commit/5255251667c46bab9a15665dbb0d8ef387bf6f7b))
+* throw away the failed test. I believe it's just a mock issue. ([eb9b889](https://github.com/hatrd/svn-scm/commit/eb9b8895d092a6de795aaae32605552fc87627fa))
+
 ## [3.0.4](https://github.com/hatrd/svn-scm/compare/v3.0.3...v3.0.4) (2025-09-09)
 
 
