@@ -16,6 +16,8 @@ import * as crypto from "crypto";
 import { configuration } from "./helpers/configuration";
 import { iconv } from "./vscodeModules";
 
+let isRegistered = false;
+
 export class File implements FileStat {
   type: FileType;
   ctime: number;
@@ -64,16 +66,19 @@ class TempSvnFs implements FileSystemProvider, Disposable {
   readonly onDidChangeFile: Event<FileChangeEvent[]> = this._emitter.event;
 
   constructor() {
-    this._disposables.push(
-      workspace.registerFileSystemProvider("tempsvnfs", this, {
-        isCaseSensitive: true
-      }),
-      workspace.onDidCloseTextDocument(event => {
-        if (event.uri.scheme === "tempsvnfs") {
-          this.delete(event.uri);
-        }
-      })
-    );
+    if (!isRegistered) {
+      isRegistered = true;
+      this._disposables.push(
+        workspace.registerFileSystemProvider("tempsvnfs", this, {
+          isCaseSensitive: true
+        }),
+        workspace.onDidCloseTextDocument(event => {
+          if (event.uri.scheme === "tempsvnfs") {
+            this.delete(event.uri);
+          }
+        })
+      );
+    }
   }
 
   watch(_resource: Uri): Disposable {
