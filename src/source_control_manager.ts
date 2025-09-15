@@ -269,7 +269,11 @@ export class SourceControlManager implements IDisposable {
   }
 
   public async tryOpenRepository(path: string, level = 0): Promise<void> {
-    if (this.getRepository(path)) {
+    // Check if this exact path already has a repository opened
+    const existingRepo = this.openRepositories.find(
+      repo => repo.repository.workspaceRoot === path
+    );
+    if (existingRepo) {
       return;
     }
 
@@ -373,6 +377,23 @@ export class SourceControlManager implements IDisposable {
     }
 
     if (hint instanceof Uri) {
+      // When multiple folders are enabled, find the most specific repository (longest path)
+      const multipleFoldersEnabled = configuration.get<boolean>(
+        "multipleFolders.enabled",
+        false
+      );
+
+      if (multipleFoldersEnabled) {
+        // Find the repository with the longest matching path (most specific)
+        return this.openRepositoriesSorted().find(liveRepository => {
+          return isDescendant(
+            liveRepository.repository.workspaceRoot,
+            hint.fsPath
+          );
+        });
+      }
+
+      // Original logic for single repository mode
       return this.openRepositoriesSorted().find(liveRepository => {
         if (
           !isDescendant(liveRepository.repository.workspaceRoot, hint.fsPath)
@@ -380,22 +401,37 @@ export class SourceControlManager implements IDisposable {
           return false;
         }
 
-        for (const external of liveRepository.repository.statusExternal) {
-          const externalPath = path.join(
-            liveRepository.repository.workspaceRoot,
-            external.path
-          );
-          if (isDescendant(externalPath, hint.fsPath)) {
-            return false;
+        // Only filter externals/ignored if detectExternals/detectIgnored is enabled
+        const shouldFilterExternals = configuration.get<boolean>(
+          "detectExternals",
+          true
+        );
+        const shouldFilterIgnored = configuration.get<boolean>(
+          "detectIgnored",
+          true
+        );
+
+        if (shouldFilterExternals) {
+          for (const external of liveRepository.repository.statusExternal) {
+            const externalPath = path.join(
+              liveRepository.repository.workspaceRoot,
+              external.path
+            );
+            if (isDescendant(externalPath, hint.fsPath)) {
+              return false;
+            }
           }
         }
-        for (const ignored of liveRepository.repository.statusIgnored) {
-          const ignoredPath = path.join(
-            liveRepository.repository.workspaceRoot,
-            ignored.path
-          );
-          if (isDescendant(ignoredPath, hint.fsPath)) {
-            return false;
+
+        if (shouldFilterIgnored) {
+          for (const ignored of liveRepository.repository.statusIgnored) {
+            const ignoredPath = path.join(
+              liveRepository.repository.workspaceRoot,
+              ignored.path
+            );
+            if (isDescendant(ignoredPath, hint.fsPath)) {
+              return false;
+            }
           }
         }
 
