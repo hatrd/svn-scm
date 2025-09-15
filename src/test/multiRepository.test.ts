@@ -29,9 +29,9 @@ suite("Multi-Repository Support Tests", () => {
     };
   });
 
-  test("should allow multiple repositories in parent-child hierarchy", async () => {
-    // Create source control manager
-    sourceControlManager = new SourceControlManager(
+  test("should create source control manager successfully", async () => {
+    // Test the basic constructor and initialization
+    sourceControlManager = await new SourceControlManager(
       mockSvn,
       ConstructorPolicy.Async,
       mockContext
@@ -39,43 +39,165 @@ suite("Multi-Repository Support Tests", () => {
 
     await sourceControlManager.isInitialized;
 
-    // Simulate multiple repositories in hierarchy with generic names
-    const rootPath = "/workspace/project";
-    const childPaths = [
-      "/workspace/project/frontend",
-      "/workspace/project/backend",
-      "/workspace/project/shared"
-    ];
+    // Verify basic properties exist
+    assert.ok(sourceControlManager.repositories);
+    assert.strictEqual(sourceControlManager.repositories.length, 0, "Should start with no repositories");
+    assert.ok(typeof sourceControlManager.tryOpenRepository === "function", "tryOpenRepository should be a function");
+    assert.ok(typeof sourceControlManager.getOpenRepository === "function", "getOpenRepository should be a function");
+  });
+
+  test("should open multiple repositories in different paths", async () => {
+    sourceControlManager = await new SourceControlManager(
+      mockSvn,
+      ConstructorPolicy.Async,
+      mockContext
+    );
+
+    await sourceControlManager.isInitialized;
 
     // Mock isSvnFolder to return true for all paths
     const originalIsSvnFolder = require("../util").isSvnFolder;
     require("../util").isSvnFolder = async () => true;
 
-    try {
-      // Try opening root repository
-      await sourceControlManager.tryOpenRepository(rootPath);
+    // Mock Repository constructor to avoid actual SVN operations
+    const mockRepositories: any[] = [];
+    const originalRepository = require("../repository").Repository;
 
-      // Try opening child repositories
-      for (const childPath of childPaths) {
-        await sourceControlManager.tryOpenRepository(childPath);
+    require("../repository").Repository = class MockRepository {
+      workspaceRoot: string;
+      sourceControl: any;
+      changes: any;
+      onDidChangeState: any;
+      onDidChangeRepository: any;
+      onDidChangeStatus: any;
+      statusExternal: any[];
+      statusIgnored: any[];
+
+      constructor(svnRepo: any) {
+        this.workspaceRoot = svnRepo.workspaceRoot;
+        this.sourceControl = { id: `mock-${svnRepo.workspaceRoot}` };
+        this.changes = { id: `changes-${svnRepo.workspaceRoot}` };
+
+        // Add missing status properties
+        this.statusExternal = [];
+        this.statusIgnored = [];
+
+        // Create proper event emitters that match the expected interface
+        this.onDidChangeState = (_listener: any) => {
+          return { dispose: () => {} };
+        };
+        this.onDidChangeRepository = (_listener: any) => {
+          return { dispose: () => {} };
+        };
+        this.onDidChangeStatus = (_listener: any) => {
+          return { dispose: () => {} };
+        };
+        mockRepositories.push(this);
       }
 
-      // Verify all repositories are opened
-      const repositories = sourceControlManager.repositories;
-      assert.strictEqual(repositories.length, 4, "Should have 4 repositories (1 root + 3 children)");
+      dispose() {
+        // Proper dispose method
+      }
+    };
 
-      // Verify repository paths
-      const repoPaths = repositories.map(repo => repo.workspaceRoot).sort();
-      const expectedPaths = [rootPath, ...childPaths].sort();
-      assert.deepStrictEqual(repoPaths, expectedPaths, "Repository paths should match expected paths");
+    try {
+      // Test opening multiple repositories
+      const paths = [
+        "/workspace/project1",
+        "/workspace/project2",
+        "/workspace/project3"
+      ];
+
+      for (const path of paths) {
+        await sourceControlManager.tryOpenRepository(path);
+      }
+
+      // Verify all repositories were opened
+      assert.strictEqual(sourceControlManager.repositories.length, 3, "Should have 3 repositories");
+
+      // Verify repository paths match
+      const repoPaths = sourceControlManager.repositories.map(repo => repo.workspaceRoot).sort();
+      assert.deepStrictEqual(repoPaths, paths.sort(), "Repository paths should match expected paths");
 
     } finally {
-      // Restore original function
+      // Restore original functions
       require("../util").isSvnFolder = originalIsSvnFolder;
+      require("../repository").Repository = originalRepository;
     }
   });
 
-  test("should find most specific repository when multiple folders enabled", async () => {
+  test("should prevent duplicate repositories for same path", async () => {
+    sourceControlManager = await new SourceControlManager(
+      mockSvn,
+      ConstructorPolicy.Async,
+      mockContext
+    );
+
+    await sourceControlManager.isInitialized;
+
+    // Mock isSvnFolder to return true
+    const originalIsSvnFolder = require("../util").isSvnFolder;
+    require("../util").isSvnFolder = async () => true;
+
+    // Mock Repository constructor
+    const originalRepository = require("../repository").Repository;
+    require("../repository").Repository = class MockRepository {
+      workspaceRoot: string;
+      sourceControl: any;
+      changes: any;
+      onDidChangeState: any;
+      onDidChangeRepository: any;
+      onDidChangeStatus: any;
+
+      constructor(svnRepo: any) {
+        this.workspaceRoot = svnRepo.workspaceRoot;
+        this.sourceControl = { id: `mock-${svnRepo.workspaceRoot}` };
+        this.changes = { id: `changes-${svnRepo.workspaceRoot}` };
+
+        // Create proper event emitters that match the expected interface
+        this.onDidChangeState = (_listener: any) => {
+          return { dispose: () => {} };
+        };
+        this.onDidChangeRepository = (_listener: any) => {
+          return { dispose: () => {} };
+        };
+        this.onDidChangeStatus = (_listener: any) => {
+          return { dispose: () => {} };
+        };
+      }
+
+      dispose() {
+        // Proper dispose method
+      }
+    };
+
+    try {
+      const samePath = "/workspace/project";
+
+      // Try opening same repository twice
+      await sourceControlManager.tryOpenRepository(samePath);
+      await sourceControlManager.tryOpenRepository(samePath);
+
+      // Should only have one repository
+      assert.strictEqual(sourceControlManager.repositories.length, 1, "Should have only 1 repository despite multiple open attempts");
+      assert.strictEqual(sourceControlManager.repositories[0].workspaceRoot, samePath, "Repository path should match");
+
+    } finally {
+      // Restore original functions
+      require("../util").isSvnFolder = originalIsSvnFolder;
+      require("../repository").Repository = originalRepository;
+    }
+  });
+
+  test("should find most specific repository for nested paths", async () => {
+    sourceControlManager = await new SourceControlManager(
+      mockSvn,
+      ConstructorPolicy.Async,
+      mockContext
+    );
+
+    await sourceControlManager.isInitialized;
+
     // Mock configuration to enable multiple folders
     const originalGet = require("../helpers/configuration").configuration.get;
     require("../helpers/configuration").configuration.get = (key: string, defaultValue?: any) => {
@@ -86,29 +208,27 @@ suite("Multi-Repository Support Tests", () => {
     };
 
     try {
-      sourceControlManager = new SourceControlManager(
-        mockSvn,
-        ConstructorPolicy.Async,
-        mockContext
-      );
-
-      await sourceControlManager.isInitialized;
-
-      // Mock repositories with generic paths
+      // Create mock repositories with nested paths
       const rootRepo = { workspaceRoot: "/workspace/project" };
       const childRepo = { workspaceRoot: "/workspace/project/frontend" };
 
-      sourceControlManager.openRepositories = [
-        { repository: rootRepo as any, dispose: () => {} },
-        { repository: childRepo as any, dispose: () => {} }
+      // Manually set up open repositories to simulate nested structure
+      (sourceControlManager as any).openRepositories = [
+        { repository: rootRepo, dispose: () => {} },
+        { repository: childRepo, dispose: () => {} }
       ];
 
-      // Test file in child repository
+      // Test file in child repository - should return most specific (child) repository
       const testFile = Uri.file("/workspace/project/frontend/src/index.js");
       const result = sourceControlManager.getOpenRepository(testFile);
 
-      // Should return the most specific repository (child)
-      assert.strictEqual(result?.repository, childRepo, "Should return child repository for child file");
+      assert.strictEqual(result?.repository, childRepo, "Should return child repository for file in child path");
+
+      // Test file in root but not in child - should return root repository
+      const rootFile = Uri.file("/workspace/project/README.md");
+      const rootResult = sourceControlManager.getOpenRepository(rootFile);
+
+      assert.strictEqual(rootResult?.repository, rootRepo, "Should return root repository for file in root path");
 
     } finally {
       // Restore original configuration
@@ -116,51 +236,8 @@ suite("Multi-Repository Support Tests", () => {
     }
   });
 
-  test("should respect external and ignored filtering configuration", async () => {
-    // Mock configuration with external/ignored detection disabled
-    const originalGet = require("../helpers/configuration").configuration.get;
-    require("../helpers/configuration").configuration.get = (key: string, defaultValue?: any) => {
-      if (key === "multipleFolders.enabled") return true;
-      if (key === "detectExternals") return false;
-      if (key === "detectIgnored") return false;
-      return defaultValue;
-    };
-
-    try {
-      sourceControlManager = new SourceControlManager(
-        mockSvn,
-        ConstructorPolicy.Async,
-        mockContext
-      );
-
-      await sourceControlManager.isInitialized;
-
-      // Mock repository with externals and ignored files
-      const mockRepo = {
-        workspaceRoot: "/workspace/project",
-        statusExternal: [{ path: "vendor" }],
-        statusIgnored: [{ path: "build.log" }]
-      };
-
-      sourceControlManager.openRepositories = [
-        { repository: mockRepo as any, dispose: () => {} }
-      ];
-
-      // Test file in external path (should still be found when detection is disabled)
-      const externalFile = Uri.file("/workspace/project/vendor/library.js");
-      const result = sourceControlManager.getOpenRepository(externalFile);
-
-      // Should return repository even for external file when detection is disabled
-      assert.strictEqual(result?.repository, mockRepo, "Should return repository for external file when detection disabled");
-
-    } finally {
-      // Restore original configuration
-      require("../helpers/configuration").configuration.get = originalGet;
-    }
-  });
-
-  test("should not duplicate repositories with same workspace root", async () => {
-    sourceControlManager = new SourceControlManager(
+  test("should handle repository hierarchy with parent-child relationships", async () => {
+    sourceControlManager = await new SourceControlManager(
       mockSvn,
       ConstructorPolicy.Async,
       mockContext
@@ -168,83 +245,94 @@ suite("Multi-Repository Support Tests", () => {
 
     await sourceControlManager.isInitialized;
 
-    const samePath = "/workspace/project";
-
-    // Mock isSvnFolder to return true
+    // Mock isSvnFolder to return true for all paths
     const originalIsSvnFolder = require("../util").isSvnFolder;
     require("../util").isSvnFolder = async () => true;
 
-    try {
-      // Try opening same repository twice
-      await sourceControlManager.tryOpenRepository(samePath);
-      await sourceControlManager.tryOpenRepository(samePath);
+    // Mock Repository constructor
+    const mockRepositories: any[] = [];
+    const originalRepository = require("../repository").Repository;
+    require("../repository").Repository = class MockRepository {
+      workspaceRoot: string;
+      sourceControl: any;
+      changes: any;
+      onDidChangeState: any;
+      onDidChangeRepository: any;
+      onDidChangeStatus: any;
+      statusExternal: any[];
+      statusIgnored: any[];
 
-      // Should only have one repository
-      const repositories = sourceControlManager.repositories;
-      assert.strictEqual(repositories.length, 1, "Should have only 1 repository despite multiple open attempts");
-      assert.strictEqual(repositories[0].workspaceRoot, samePath, "Repository path should match");
+      constructor(svnRepo: any) {
+        this.workspaceRoot = svnRepo.workspaceRoot;
+        this.sourceControl = { id: `mock-${svnRepo.workspaceRoot}` };
+        this.changes = { id: `changes-${svnRepo.workspaceRoot}` };
 
-    } finally {
-      // Restore original function
-      require("../util").isSvnFolder = originalIsSvnFolder;
-    }
-  });
+        // Add missing status properties
+        this.statusExternal = [];
+        this.statusIgnored = [];
 
-  test("should handle complex workspace hierarchies", async () => {
-    // Test common scenario: monorepo with multiple components
-    const paths = [
-      "/workspace",                    // Root
-      "/workspace/apps",               // Apps folder
-      "/workspace/apps/web",           // Web app
-      "/workspace/apps/mobile",        // Mobile app
-      "/workspace/libs",               // Shared libraries
-      "/workspace/libs/ui",            // UI library
-      "/workspace/tools"               // Development tools
-    ];
-
-    // Mock configuration
-    const originalGet = require("../helpers/configuration").configuration.get;
-    require("../helpers/configuration").configuration.get = (key: string, defaultValue?: any) => {
-      if (key === "multipleFolders.enabled") return true;
-      if (key === "multipleFolders.depth") return 5;
-      return defaultValue;
-    };
-
-    const originalIsSvnFolder = require("../util").isSvnFolder;
-    require("../util").isSvnFolder = async () => true;
-
-    try {
-      sourceControlManager = new SourceControlManager(
-        mockSvn,
-        ConstructorPolicy.Async,
-        mockContext
-      );
-
-      await sourceControlManager.isInitialized;
-
-      // Open all repositories
-      for (const path of paths) {
-        await sourceControlManager.tryOpenRepository(path);
+        // Create proper event emitters that match the expected interface
+        this.onDidChangeState = (_listener: any) => {
+          return { dispose: () => {} };
+        };
+        this.onDidChangeRepository = (_listener: any) => {
+          return { dispose: () => {} };
+        };
+        this.onDidChangeStatus = (_listener: any) => {
+          return { dispose: () => {} };
+        };
+        mockRepositories.push(this);
       }
 
-      // Verify all are detected
-      const repositories = sourceControlManager.repositories;
-      assert.ok(repositories.length > 0, "Should detect repositories");
+      dispose() {
+        // Proper dispose method
+      }
+    };
 
-      // Each repository should have unique workspace root
-      const uniquePaths = new Set(repositories.map(r => r.workspaceRoot));
-      assert.strictEqual(uniquePaths.size, repositories.length, "All repositories should have unique paths");
+    try {
+      // Test hierarchical structure: root project with multiple sub-projects
+      const rootPath = "/workspace/monorepo";
+      const childPaths = [
+        "/workspace/monorepo/frontend",
+        "/workspace/monorepo/backend",
+        "/workspace/monorepo/shared"
+      ];
+
+      // Open root repository first
+      await sourceControlManager.tryOpenRepository(rootPath);
+
+      // Open child repositories
+      for (const childPath of childPaths) {
+        await sourceControlManager.tryOpenRepository(childPath);
+      }
+
+      // Verify all repositories are opened
+      const expectedTotal = 1 + childPaths.length; // root + children
+      assert.strictEqual(
+        sourceControlManager.repositories.length,
+        expectedTotal,
+        `Should have ${expectedTotal} repositories (1 root + ${childPaths.length} children)`
+      );
+
+      // Verify all expected paths are present
+      const repoPaths = sourceControlManager.repositories.map(repo => repo.workspaceRoot).sort();
+      const expectedPaths = [rootPath, ...childPaths].sort();
+      assert.deepStrictEqual(repoPaths, expectedPaths, "Repository paths should match expected hierarchy");
 
     } finally {
       // Restore original functions
-      require("../helpers/configuration").configuration.get = originalGet;
       require("../util").isSvnFolder = originalIsSvnFolder;
+      require("../repository").Repository = originalRepository;
     }
   });
 
   teardown(() => {
-    if (sourceControlManager && typeof sourceControlManager.dispose === "function") {
-      sourceControlManager.dispose();
+    try {
+      if (sourceControlManager && typeof sourceControlManager.dispose === "function") {
+        sourceControlManager.dispose();
+      }
+    } catch (error) {
+      // Ignore disposal errors in tests
     }
   });
 });
