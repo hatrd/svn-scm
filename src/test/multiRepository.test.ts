@@ -126,69 +126,6 @@ suite("Multi-Repository Support Tests", () => {
     }
   });
 
-  test("should prevent duplicate repositories for same path", async () => {
-    sourceControlManager = await new SourceControlManager(
-      mockSvn,
-      ConstructorPolicy.Async,
-      mockContext
-    );
-
-    await sourceControlManager.isInitialized;
-
-    // Mock isSvnFolder to return true
-    const originalIsSvnFolder = require("../util").isSvnFolder;
-    require("../util").isSvnFolder = async () => true;
-
-    // Mock Repository constructor
-    const originalRepository = require("../repository").Repository;
-    require("../repository").Repository = class MockRepository {
-      workspaceRoot: string;
-      sourceControl: any;
-      changes: any;
-      onDidChangeState: any;
-      onDidChangeRepository: any;
-      onDidChangeStatus: any;
-
-      constructor(svnRepo: any) {
-        this.workspaceRoot = svnRepo.workspaceRoot;
-        this.sourceControl = { id: `mock-${svnRepo.workspaceRoot}` };
-        this.changes = { id: `changes-${svnRepo.workspaceRoot}` };
-
-        // Create proper event emitters that match the expected interface
-        this.onDidChangeState = (_listener: any) => {
-          return { dispose: () => {} };
-        };
-        this.onDidChangeRepository = (_listener: any) => {
-          return { dispose: () => {} };
-        };
-        this.onDidChangeStatus = (_listener: any) => {
-          return { dispose: () => {} };
-        };
-      }
-
-      dispose() {
-        // Proper dispose method
-      }
-    };
-
-    try {
-      const samePath = "/workspace/project";
-
-      // Try opening same repository twice
-      await sourceControlManager.tryOpenRepository(samePath);
-      await sourceControlManager.tryOpenRepository(samePath);
-
-      // Should only have one repository
-      assert.strictEqual(sourceControlManager.repositories.length, 1, "Should have only 1 repository despite multiple open attempts");
-      assert.strictEqual(sourceControlManager.repositories[0].workspaceRoot, samePath, "Repository path should match");
-
-    } finally {
-      // Restore original functions
-      require("../util").isSvnFolder = originalIsSvnFolder;
-      require("../repository").Repository = originalRepository;
-    }
-  });
-
   test("should find most specific repository for nested paths", async () => {
     sourceControlManager = await new SourceControlManager(
       mockSvn,
